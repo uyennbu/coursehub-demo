@@ -69,3 +69,55 @@ print(search_courses("web"))
 
 
 # Check adding new code
+
+# Home work:
+
+def find_student(student_id):
+    for s in students:
+        if s["id"] == student_id:
+            return s
+    return None
+
+def enroll_student(student_id, course_code):
+    # check if student exists
+    if find_student(student_id):
+        # check if course exists and
+        # check if seat available and student can enroll:
+        can_er, status = can_enroll(student_id, course_code)
+        print(status)
+        if can_er:
+            print("Bat dau dang ky")
+            enrollments.append({"student_id": student_id, "course_code": course_code})
+            course = find_course(course_code)
+            course["enrolled"] += 1
+            print("Dang ky thanh cong")
+        
+    else:
+        print("Sinh vien khong ton tai")
+
+def test_enroll_student():
+    # test 1: invalid student
+    print("Test 1: invalid student, expecting rejection")
+    enroll_student(student_id = "haha", course_code = "INT2204")
+
+    # test 2: invalid course
+    print("Test 2: invalid course, expecting rejection")
+    enroll_student(student_id = "22000001", course_code = "haha")
+
+    # test 3: no seat available
+    print("Test 3: not enough seat, expecting rejection")
+    enroll_student(student_id = "22000002", course_code = "INT2205")
+
+    # test 4: student already enrolled
+    # {"student_id": "22000001", "course_code": "INT2204"}
+    print("Test 4: overlap enrollment, expecting rejection")
+    enroll_student(student_id = "22000001", course_code = "INT2204")
+
+    # test 5: success
+    print("Test 5: valid enrollment, excepting acception")
+    enroll_student(student_id = "22000002", course_code = "INT2204")
+
+print("#-------------------------------------")
+print("#----TEST enroll_student -------------")
+print("#-------------------------------------")
+test_enroll_student()
