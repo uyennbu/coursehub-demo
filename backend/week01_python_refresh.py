@@ -31,7 +31,6 @@ def find_course(course_code):
         if course["code"] == course_code:
             # print(course)
             return course
-    
 
 print(find_course("INT2204"))
 
@@ -67,3 +66,6 @@ def search_courses(keyword):
             results.append(course)
     return results
 print(search_courses("web"))
+
+
+# Check adding new code
