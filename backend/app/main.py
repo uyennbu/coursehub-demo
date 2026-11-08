@@ -95,17 +95,41 @@ def get_course(course_code: str, skip=0, limit=10) -> dict[str, object]:
 
 @app.get("/sections")
 def list_sections(
-    available_only: bool = False,
+    q: str | None = Query(default=None, description="Tu khoa tim kiem lop hoac hoc phan"),
+    course_code: str | None = Query(default=None, description="Loc theo ma hoc phan"),
+    available_only: bool = Query(default=False, description="Chi hien thi lop con cho"),
+    skip: int = Query(default=0, ge=0, description="So luong ban ghi bo qua"),
+    limit: int = Query(default=10, ge=1, le=100, description="Gioi han tu 1 den 100 ban ghi"),
 ) -> list[dict[str, object]]:
     sql = """
-        SELECT class_id, course_code, capacity, enrolled, remaining
-        FROM v_section_summary
+        SELECT vs.class_id, vs.course_code, c.name AS course_name, vs.capacity, vs.enrolled, vs.remaining
+        FROM v_section_summary AS vs
+        JOIN courses AS c ON c.code = vs.course_code
     """
+    conditions: list[str] = []
+    parameters: dict[str, object] = {
+        "skip": skip,
+        "limit": limit,
+    }
+
     if available_only:
-        sql += " WHERE remaining > 0"
-    sql += " ORDER BY class_id"
+        conditions.append("vs.remaining > 0")
+
+    if course_code is not None and course_code.strip():
+        conditions.append("vs.course_code = :course_code")
+        parameters["course_code"] = course_code.strip().upper()
+
+    if q is not None and q.strip():
+        conditions.append("(LOWER(vs.class_id) LIKE :keyword OR LOWER(vs.course_code) LIKE :keyword OR LOWER(c.name) LIKE :keyword)")
+        parameters["keyword"] = f"%{q.strip().lower()}%"
+
+    if conditions:
+        sql += " WHERE " + " AND ".join(conditions)
+
+    sql += " ORDER BY vs.class_id ASC OFFSET :skip LIMIT :limit"
+
     with engine.connect() as connection:
-        rows = connection.execute(text(sql)).mappings().all()
+        rows = connection.execute(text(sql), parameters).mappings().all()
     return [dict(row) for row in rows]
 
 @app.get("/students/{student_id}/enrollments")

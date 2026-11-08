@@ -7,6 +7,7 @@ import StudentForm from "./components/StudentForm.jsx";
 import EventHistory from "./components/EventHistory.jsx";
 
 const EVENT_PAGE_SIZE = 5;
+const SECTION_PAGE_SIZE = 5;
 
 export default function App() {
     const [draftId, setDraftId] = useState("22000004");
@@ -16,6 +17,7 @@ export default function App() {
     const [enrollments, setEnrollments] = useState([]);
     const [events, setEvents] = useState([]);
     const [eventPage, setEventPage] = useState(0);
+    const [sectionPage, setSectionPage] = useState(0);
     const [loadingEvents, setLoadingEvents] = useState(false);
     const [activeTab, setActiveTab] = useState("enroll");
     const [search, setSearch] = useState("");
@@ -33,9 +35,16 @@ export default function App() {
             setLoading(true);
             setError("");
             try {
+                const sectionParams = new URLSearchParams();
+                if (search.trim()) sectionParams.set("q", search.trim());
+                if (courseFilter) sectionParams.set("course_code", courseFilter);
+                if (onlyAvailable) sectionParams.set("available_only", "true");
+                sectionParams.set("skip", String(sectionPage * SECTION_PAGE_SIZE));
+                sectionParams.set("limit", String(SECTION_PAGE_SIZE));
+
                 const [courseData, sectionData, enrollmentData] = await Promise.all([
                     api("/courses", options),
-                    api("/sections", options),
+                    api(`/sections?${sectionParams.toString()}`, options),
                     api(`/students/${encodeURIComponent(studentId)}/enrollments`,
                         options),
                 ]);
@@ -55,7 +64,7 @@ export default function App() {
         }
         loadData();
         return () => controller.abort();
-    }, [studentId, refresh]);
+    }, [studentId, refresh, search, courseFilter, onlyAvailable, sectionPage]);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -127,20 +136,14 @@ export default function App() {
         }
     }
 
-    const keyword = search.trim().toLowerCase();
     const rows = sections.map((section) => ({
         ...section,
-        course_name: courses.find((course) => course.code ===
-            section.course_code)?.name
+        course_name: section.course_name
+            ?? courses.find((course) => course.code === section.course_code)?.name
             ?? section.course_code,
         registered: enrollments.some((item) => item.class_section_id ===
             section.class_id),
-    })).filter((row) => (
-        (!courseFilter || row.course_code === courseFilter)
-        && `${row.class_id} ${row.course_code}
-${row.course_name}`.toLowerCase().includes(keyword)
-        && (!onlyAvailable || row.remaining > 0)
-    ));
+    }));
     const disabled = loading || busy || Boolean(error);
 
     return (
@@ -203,13 +206,23 @@ ${row.course_name}`.toLowerCase().includes(keyword)
                                 <h2>2. Danh sách lớp học phần</h2>
                                 <div className="filters">
                                     <label htmlFor="search">Tìm lớp / học phần</label>
-                                    <input id="search" value={search} placeholder="Ví dụ: web"
-                                        onChange={(e) => setSearch(e.target.value)} />
+                                    <input
+                                        id="search"
+                                        value={search}
+                                        placeholder="Ví dụ: web"
+                                        onChange={(e) => {
+                                            setSearch(e.target.value);
+                                            setSectionPage(0);
+                                        }}
+                                    />
                                     <select
                                         id="course-filter"
                                         aria-label="Lọc theo mã học phần"
                                         value={courseFilter}
-                                        onChange={(e) => setCourseFilter(e.target.value)}
+                                        onChange={(e) => {
+                                            setCourseFilter(e.target.value);
+                                            setSectionPage(0);
+                                        }}
                                     >
                                         <option value="">Tất cả học phần</option>
                                         {courses.map((course) => (
@@ -219,13 +232,41 @@ ${row.course_name}`.toLowerCase().includes(keyword)
                                         ))}
                                     </select>
                                     <label className="check">
-                                        <input type="checkbox" checked={onlyAvailable}
-                                            onChange={(e) => setOnlyAvailable(e.target.checked)} />
+                                        <input
+                                            type="checkbox"
+                                            checked={onlyAvailable}
+                                            onChange={(e) => {
+                                                setOnlyAvailable(e.target.checked);
+                                                setSectionPage(0);
+                                            }}
+                                        />
                                         Chỉ hiển thị lớp còn chỗ
                                     </label>
                                 </div>
                                 <SectionTable rows={rows} disabled={disabled}
                                     onEnroll={(id) => changeEnrollment(id)} />
+
+                                <div className="pagination">
+                                    <button
+                                        type="button"
+                                        className="secondary"
+                                        disabled={disabled || loading || sectionPage === 0}
+                                        onClick={() => setSectionPage((p) => Math.max(0, p - 1))}
+                                    >
+                                        ← Trang trước
+                                    </button>
+                                    <span className="pagination-info">
+                                        Trang {sectionPage + 1}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        className="secondary"
+                                        disabled={disabled || loading || sections.length < SECTION_PAGE_SIZE}
+                                        onClick={() => setSectionPage((p) => p + 1)}
+                                    >
+                                        Trang sau →
+                                    </button>
+                                </div>
                             </section>
                             <section className="panel">
                                 <h2>3. Lớp đã đăng ký</h2>
