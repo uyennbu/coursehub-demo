@@ -4,6 +4,9 @@ import Notice from "./components/Notice.jsx";
 import SectionTable from "./components/SectionTable.jsx";
 import EnrollmentList from "./components/EnrollmentList.jsx";
 import StudentForm from "./components/StudentForm.jsx";
+import EventHistory from "./components/EventHistory.jsx";
+
+const EVENT_PAGE_SIZE = 5;
 
 export default function App() {
     const [draftId, setDraftId] = useState("22000004");
@@ -11,6 +14,10 @@ export default function App() {
     const [courses, setCourses] = useState([]);
     const [sections, setSections] = useState([]);
     const [enrollments, setEnrollments] = useState([]);
+    const [events, setEvents] = useState([]);
+    const [eventPage, setEventPage] = useState(0);
+    const [loadingEvents, setLoadingEvents] = useState(false);
+    const [activeTab, setActiveTab] = useState("enroll");
     const [search, setSearch] = useState("");
     const [courseFilter, setCourseFilter] = useState("");
     const [onlyAvailable, setOnlyAvailable] = useState(false);
@@ -49,15 +56,41 @@ export default function App() {
         loadData();
         return () => controller.abort();
     }, [studentId, refresh]);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        const options = { signal: controller.signal };
+        async function loadEvents() {
+            setLoadingEvents(true);
+            try {
+                const skip = eventPage * EVENT_PAGE_SIZE;
+                const data = await api(
+                    `/enrollment-events?student_id=${encodeURIComponent(studentId)}&source=api&skip=${skip}&limit=${EVENT_PAGE_SIZE}`,
+                    options,
+                );
+                if (controller.signal.aborted) return;
+                setEvents(data || []);
+            } catch (err) {
+                if (controller.signal.aborted) return;
+                setEvents([]);
+            } finally {
+                if (!controller.signal.aborted) setLoadingEvents(false);
+            }
+        }
+        loadEvents();
+        return () => controller.abort();
+    }, [studentId, eventPage, refresh]);
+
     function chooseStudent(event) {
         event.preventDefault();
         const nextId = draftId.trim();
         if (!/^\d{8}$/.test(nextId)) {
-            setNotice({ kind: "error", text: "Mã demo phaỉ gồm 8 chữ số." });
+            setNotice({ kind: "error", text: "Mã demo phải gồm 8 chữ số." });
             return;
         }
         setNotice({ kind: "info", text: "" });
         setLoading(true);
+        setEventPage(0);
         setStudentId(nextId);
         setRefresh((value) => value + 1);
     }
@@ -139,43 +172,86 @@ ${row.course_name}`.toLowerCase().includes(keyword)
             <Notice kind="error">{error}</Notice>
             {loading && <Notice>Đang tải dữ liệu từ API...</Notice>}
             {!loading && !error && (
-                <div className="workspace">
-                    <section className="panel">
-                        <h2>2. Danh sách lớp học phần</h2>
-                        <div className="filters">
-                            <label htmlFor="search">Tìm lớp / học phần</label>
-                            <input id="search" value={search} placeholder="Ví dụ: web"
-                                onChange={(e) => setSearch(e.target.value)} />
-                            <select
-                                id="course-filter"
-                                aria-label="Lọc theo mã học phần"
-                                value={courseFilter}
-                                onChange={(e) => setCourseFilter(e.target.value)}
-                            >
-                                <option value="">Tất cả học phần</option>
-                                {courses.map((course) => (
-                                    <option key={course.code} value={course.code}>
-                                        {course.code} - {course.name}
-                                    </option>
-                                ))}
-                            </select>
-                            <label className="check">
-                                <input type="checkbox" checked={onlyAvailable}
-                                    onChange={(e) => setOnlyAvailable(e.target.checked)} />
-                                Chỉ hiển thị lớp còn chỗ
-                            </label>
-                        </div>
-                        <SectionTable rows={rows} disabled={disabled}
-                            onEnroll={(id) => changeEnrollment(id)} />
-                    </section>
-                    <section className="panel">
-                        <h2>3. Lớp đã đăng ký</h2>
-                        <p className="muted">Sinh viên {studentId} · {enrollments.length} lớp</p>
+                <>
+                    <nav className="tabs" aria-label="Chuyển đổi màn hình">
+                        <button
+                            type="button"
+                            className={activeTab === "enroll" ? "tab-btn active" : "tab-btn"}
+                            onClick={() => setActiveTab("enroll")}
+                        >
+                            Đăng ký học phần
+                        </button>
+                        <button
+                            type="button"
+                            className={activeTab === "history" ? "tab-btn active" : "tab-btn"}
+                            onClick={() => setActiveTab("history")}
+                        >
+                            Lịch sử đăng ký
+                        </button>
+                        <button
+                            type="button"
+                            className={activeTab === "all" ? "tab-btn active" : "tab-btn"}
+                            onClick={() => setActiveTab("all")}
+                        >
+                            Xem tất cả
+                        </button>
+                    </nav>
 
-                        <EnrollmentList rows={enrollments} disabled={disabled}
-                            onCancel={(id) => changeEnrollment(id, true)} />
-                    </section>
-                </div>
+                    {(activeTab === "enroll" || activeTab === "all") && (
+                        <div className="workspace">
+                            <section className="panel">
+                                <h2>2. Danh sách lớp học phần</h2>
+                                <div className="filters">
+                                    <label htmlFor="search">Tìm lớp / học phần</label>
+                                    <input id="search" value={search} placeholder="Ví dụ: web"
+                                        onChange={(e) => setSearch(e.target.value)} />
+                                    <select
+                                        id="course-filter"
+                                        aria-label="Lọc theo mã học phần"
+                                        value={courseFilter}
+                                        onChange={(e) => setCourseFilter(e.target.value)}
+                                    >
+                                        <option value="">Tất cả học phần</option>
+                                        {courses.map((course) => (
+                                            <option key={course.code} value={course.code}>
+                                                {course.code} - {course.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <label className="check">
+                                        <input type="checkbox" checked={onlyAvailable}
+                                            onChange={(e) => setOnlyAvailable(e.target.checked)} />
+                                        Chỉ hiển thị lớp còn chỗ
+                                    </label>
+                                </div>
+                                <SectionTable rows={rows} disabled={disabled}
+                                    onEnroll={(id) => changeEnrollment(id)} />
+                            </section>
+                            <section className="panel">
+                                <h2>3. Lớp đã đăng ký</h2>
+                                <p className="muted">Sinh viên {studentId} · {enrollments.length} lớp</p>
+
+                                <EnrollmentList rows={enrollments} disabled={disabled}
+                                    onCancel={(id) => changeEnrollment(id, true)} />
+                            </section>
+                        </div>
+                    )}
+
+                    {(activeTab === "history" || activeTab === "all") && (
+                        <section className="panel">
+                            <h2>{activeTab === "all" ? "4. Lịch sử sự kiện của sinh viên" : "2. Lịch sử sự kiện của sinh viên"}</h2>
+                            <EventHistory
+                                events={events}
+                                studentId={studentId}
+                                loading={loadingEvents}
+                                page={eventPage}
+                                pageSize={EVENT_PAGE_SIZE}
+                                onPageChange={(newPage) => setEventPage(newPage)}
+                                disabled={disabled}
+                            />
+                        </section>
+                    )}
+                </>
             )}
             <footer>Sổ chữ và đăng ký được độc từ API; Backend quyết định tính hợp lệ.</footer>
         </main>
