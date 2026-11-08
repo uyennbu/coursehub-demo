@@ -6,3 +6,4 @@
 - Performance data: 100000 rows, dataset=performance.
 - Index: idx_enrollment_events_dataset_student_time.
 - Scan time truoc: 5.555 ms  | sau: 0.159 ms
+- Migration 002: thêm cột note vào enrollment_events, rollback. Khi rollback trong bảng enrollment_events chỉ có cột note bị xóa, các dữ liệu khác ban đầu không bị ảnh hưởng. Version 002 bị xóa khỏi schema_migrations
