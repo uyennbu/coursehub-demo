@@ -875,6 +875,28 @@
         }
       },
       "response": []
+    },
+    {
+      "name": "Get enrollment events - Data available (bai 1)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": ""
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get enrollment events  - No data (bai 1)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": ""
+        }
+      },
+      "response": []
     }
   ]
 }
