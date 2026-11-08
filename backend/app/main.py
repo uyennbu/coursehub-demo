@@ -5,6 +5,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from .database import engine
 from .schemas import EnrollmentCreate, UpdateCapacityRequest
+from fastapi.middleware.cors import CORSMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +13,15 @@ app = FastAPI(
     title="CourseHub API",
     version="0.4.0",
     description="API thuc hanh Buoi 4 - transaction, locking va hieu nang",
+)
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['http://localhost:5173', 'http://127.0.0.1:5173'],
+    allow_credentials=False,
+    allow_methods=['GET', 'POST', 'DELETE'],
+    allow_headers=['Content-Type'],
 )
 
 @app.get("/")
@@ -85,17 +95,41 @@ def get_course(course_code: str, skip=0, limit=10) -> dict[str, object]:
 
 @app.get("/sections")
 def list_sections(
-    available_only: bool = False,
+    q: str | None = Query(default=None, description="Tu khoa tim kiem lop hoac hoc phan"),
+    course_code: str | None = Query(default=None, description="Loc theo ma hoc phan"),
+    available_only: bool = Query(default=False, description="Chi hien thi lop con cho"),
+    skip: int = Query(default=0, ge=0, description="So luong ban ghi bo qua"),
+    limit: int = Query(default=10, ge=1, le=100, description="Gioi han tu 1 den 100 ban ghi"),
 ) -> list[dict[str, object]]:
     sql = """
-        SELECT class_id, course_code, capacity, enrolled, remaining
-        FROM v_section_summary
+        SELECT vs.class_id, vs.course_code, c.name AS course_name, vs.capacity, vs.enrolled, vs.remaining
+        FROM v_section_summary AS vs
+        JOIN courses AS c ON c.code = vs.course_code
     """
+    conditions: list[str] = []
+    parameters: dict[str, object] = {
+        "skip": skip,
+        "limit": limit,
+    }
+
     if available_only:
-        sql += " WHERE remaining > 0"
-    sql += " ORDER BY class_id"
+        conditions.append("vs.remaining > 0")
+
+    if course_code is not None and course_code.strip():
+        conditions.append("vs.course_code = :course_code")
+        parameters["course_code"] = course_code.strip().upper()
+
+    if q is not None and q.strip():
+        conditions.append("(LOWER(vs.class_id) LIKE :keyword OR LOWER(vs.course_code) LIKE :keyword OR LOWER(c.name) LIKE :keyword)")
+        parameters["keyword"] = f"%{q.strip().lower()}%"
+
+    if conditions:
+        sql += " WHERE " + " AND ".join(conditions)
+
+    sql += " ORDER BY vs.class_id ASC OFFSET :skip LIMIT :limit"
+
     with engine.connect() as connection:
-        rows = connection.execute(text(sql)).mappings().all()
+        rows = connection.execute(text(sql), parameters).mappings().all()
     return [dict(row) for row in rows]
 
 @app.get("/students/{student_id}/enrollments")
@@ -399,11 +433,12 @@ def update_capacity(
 def list_enrollment_events(
     student_id: str | None = Query(default=None),
     event_type: str | None = Query(default=None),
+    source: str | None = Query(default=None),
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1, le=100),
 ) -> list[dict[str, object]]:
     sql = """
-        SELECT id, student_id, class_section_id, event_type, source, dataset, occurred_at
+        SELECT id, student_id, class_section_id, event_type, source, occurred_at
         FROM enrollment_events
     """
     conditions: list[str] = []
@@ -419,6 +454,10 @@ def list_enrollment_events(
     if event_type is not None and event_type.strip():
         conditions.append("event_type = :event_type")
         parameters["event_type"] = event_type.strip().upper()
+
+    if source is not None and source.strip():
+        conditions.append("source = :source")
+        parameters["source"] = source.strip()
 
     if conditions:
         sql += " WHERE " + " AND ".join(conditions)
