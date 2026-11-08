@@ -24,11 +24,11 @@ p { margin: 10px 0; }
 .student-form { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .student-form input { width: 170px; }
 label { font-weight: 600; }
-input:not([type="checkbox"]) {
+input:not([type="checkbox"]), select {
   border: 1px solid #9dacbd; border-radius: 7px; padding: 9px 11px;
-  font: inherit; min-width: 0;
+  font: inherit; min-width: 0; background: #fff;
 }
-input:focus, button:focus-visible { outline: 3px solid #83b6e8; outline-offset: 2px; }
+input:focus, select:focus, button:focus-visible { outline: 3px solid #83b6e8; outline-offset: 2px; }
 button {
   border: 1px solid #20588a; background: #20588a; color: #fff;
   border-radius: 7px; padding: 9px 12px; font: inherit;
@@ -43,7 +43,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .workspace .panel { min-width: 0; }
 .filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
 .filters > label:first-child { width: 100%; font-size: 13px; }
-.filters input:not([type="checkbox"]) { flex: 1; width: 150px; }
+.filters input:not([type="checkbox"]), .filters select { flex: 1; width: 150px; }
 .check { display: flex; gap: 6px; align-items: center; font-size: 13px; }
 .table-scroll { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 13px; }
